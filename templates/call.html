@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Translation Call - Room {{ room_code }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="#">🌉 Voice Bridge - Room: {{ room_code }}</a>
+            <div class="navbar-nav ms-auto">
+                <span class="navbar-text me-3">{{ username }}</span>
+                <a class="nav-link" href="/dashboard">Leave Room</a>
+            </div>
+        </div>
+    </nav>
+    
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Translation Controls</h5>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="sourceLanguage" class="form-label">Your Language</label>
+                                <select class="form-select" id="sourceLanguage">
+                                    <option value="en-US">English</option>
+                                    <option value="es-ES">Spanish</option>
+                                    <option value="fr-FR">French</option>
+                                    <option value="de-DE">German</option>
+                                    <option value="hi-IN">Hindi</option>
+                                    <option value="zh-CN">Chinese</option>
+                                    <option value="ja-JP">Japanese</option>
+                                    <option value="ar-SA">Arabic</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="targetLanguage" class="form-label">Translate To</label>
+                                <select class="form-select" id="targetLanguage">
+                                    <option value="es-ES">Spanish</option>
+                                    <option value="en-US">English</option>
+                                    <option value="fr-FR">French</option>
+                                    <option value="de-DE">German</option>
+                                    <option value="hi-IN">Hindi</option>
+                                    <option value="zh-CN">Chinese</option>
+                                    <option value="ja-JP">Japanese</option>
+                                    <option value="ar-SA">Arabic</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="text-center mb-3">
+                            <button id="startBtn" class="btn btn-success btn-lg me-2">🎤 Start Translation</button>
+                            <button id="stopBtn" class="btn btn-danger btn-lg" disabled>⏹️ Stop</button>
+                        </div>
+                        
+                        <div id="status" class="alert alert-info">
+                            Click "Start Translation" to begin. Make sure to allow microphone access.
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Translation History</h5>
+                        <div id="translationHistory" style="height: 300px; overflow-y: auto;">
+                            <p class="text-muted">Translations will appear here...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        const roomCode = '{{ room_code }}';
+        const username = '{{ username }}';
+        let mediaRecorder;
+        let isRecording = false;
+        
+        // Join room
+        socket.emit('join', {room: roomCode, username: username});
+        
+        // UI Elements
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const status = document.getElementById('status');
+        const history = document.getElementById('translationHistory');
+        
+        startBtn.addEventListener('click', startTranslation);
+        stopBtn.addEventListener('click', stopTranslation);
+        
+        async function startTranslation() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                
+                mediaRecorder = new MediaRecorder(stream);
+                const audioChunks = [];
+                
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                };
+                
+                mediaRecorder.onstop = async () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    await sendAudioForTranslation(audioBlob);
+                };
+                
+                mediaRecorder.start();
+                isRecording = true;
+                
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+                status.textContent = '🎤 Recording... Speak now!';
+                status.className = 'alert alert-success';
+                
+            } catch (error) {
+                console.error('Error accessing microphone:', error);
+                status.textContent = 'Error: Could not access microphone. Please allow microphone access.';
+                status.className = 'alert alert-danger';
+            }
+        }
+        
+        function stopTranslation() {
+            if (mediaRecorder && isRecording) {
+                mediaRecorder.stop();
+                isRecording = false;
+                
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+                status.textContent = '🔄 Processing translation...';
+                status.className = 'alert alert-warning';
+            }
+        }
+        
+        async function sendAudioForTranslation(audioBlob) {
+            const formData = new FormData();
+            formData.append('audio', audioBlob, 'audio.wav');
+            formData.append('source_lang', document.getElementById('sourceLanguage').value);
+            formData.append('target_lang', document.getElementById('targetLanguage').value);
+            
+            try {
+                const response = await fetch('/translate-audio', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    displayTranslation(result.transcript, result.translation);
+                    playTranslatedAudio(result.audio);
+                    status.textContent = '✅ Translation complete!';
+                    status.className = 'alert alert-success';
+                } else {
+                    status.textContent = '❌ Translation failed: ' + result.message;
+                    status.className = 'alert alert-danger';
+                }
+            } catch (error) {
+                console.error('Translation error:', error);
+                status.textContent = '❌ Translation failed. Please try again.';
+                status.className = 'alert alert-danger';
+            }
+        }
+        
+        function displayTranslation(original, translated) {
+            const timestamp = new Date().toLocaleTimeString();
+            const translationDiv = document.createElement('div');
+            translationDiv.className = 'mb-2 p-2 border rounded';
+            translationDiv.innerHTML = `
+                <small class="text-muted">${timestamp}</small><br>
+                <strong>You:</strong> ${original}<br>
+                <strong>Translation:</strong> ${translated}
+            `;
+            history.insertBefore(translationDiv, history.firstChild);
+        }
+        
+        function playTranslatedAudio(audioBase64) {
+            const audio = new Audio('data:audio/wav;base64,' + audioBase64);
+            audio.play().catch(e => console.log('Audio playback failed:', e));
+        }
+        
+        // Socket events
+        socket.on('user-connected', (data) => {
+            status.textContent = `${data.username} joined the room`;
+            status.className = 'alert alert-info';
+        });
+        
+        socket.on('user-disconnected', (data) => {
+            status.textContent = `${data.username} left the room`;
+            status.className = 'alert alert-warning';
+        });
+    </script>
+</body>
+</html>

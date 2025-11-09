@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Voice Bridge</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="#">🌉 Voice Bridge</a>
+            <div class="navbar-nav ms-auto">
+                <span class="navbar-text me-3">Welcome, {{ username }}!</span>
+                <a class="nav-link" href="/logout">Logout</a>
+            </div>
+        </div>
+    </nav>
+    
+    <div class="container mt-5">
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <h2 class="card-title mb-4">Voice Translation Dashboard</h2>
+                        <p class="text-muted mb-4">Create or join a translation room</p>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <div class="card h-100">
+                                    <div class="card-body">
+                                        <h5 class="card-title">Create New Room</h5>
+                                        <p class="card-text">Start a new translation session</p>
+                                        <button class="btn btn-primary" onclick="createRoom()">Create Room</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="card h-100">
+                                    <div class="card-body">
+                                        <h5 class="card-title">Join Room</h5>
+                                        <div class="input-group mb-3">
+                                            <input type="text" class="form-control" id="roomCode" placeholder="Enter room code">
+                                            <button class="btn btn-outline-secondary" onclick="joinRoom()">Join</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div id="roomInfo" class="mt-4" style="display: none;">
+                            <div class="alert alert-success">
+                                <h5>Room Created!</h5>
+                                <p>Room Code: <strong id="generatedRoomCode"></strong></p>
+                                <p>Share this code with others to join your translation session</p>
+                                <button class="btn btn-success" onclick="enterRoom()">Enter Room</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        async function createRoom() {
+            try {
+                const response = await fetch('/create-room', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'}
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    document.getElementById('generatedRoomCode').textContent = result.room_code;
+                    document.getElementById('roomInfo').style.display = 'block';
+                    window.currentRoomCode = result.room_code;
+                } else {
+                    alert('Failed to create room');
+                }
+            } catch (error) {
+                alert('Error creating room');
+            }
+        }
+        
+        function joinRoom() {
+            const roomCode = document.getElementById('roomCode').value.trim();
+            if (roomCode) {
+                window.location.href = `/call/${roomCode}`;
+            } else {
+                alert('Please enter a room code');
+            }
+        }
+        
+        function enterRoom() {
+            if (window.currentRoomCode) {
+                window.location.href = `/call/${window.currentRoomCode}`;
+            }
+        }
+    </script>
+</body>
+</html>

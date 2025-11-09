@@ -1,0 +1,24 @@
+# Voice Bridge - FREE VERSION Dependencies
+# NO PAID APIs OR GOOGLE CLOUD REQUIRED!
+
+# Core Web Framework
+Flask==2.3.3
+Flask-SocketIO==5.1.0
+Flask-SQLAlchemy==3.1.1
+Werkzeug==3.0.1
+
+# WebSocket Support
+python-socketio==5.3.0
+
+# Database
+SQLAlchemy==2.0.36
+
+# FREE Speech and Translation Libraries (NO API KEYS NEEDED!)
+SpeechRecognition==3.10.1
+googletrans==4.0.0rc1
+gTTS==2.5.0
+
+# Audio Processing (PyAudio removed - not needed for web deployment)
+
+# Utilities
+python-dotenv==1.0.0
